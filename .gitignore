@@ -1,0 +1,11 @@
+# Binary
+orchat
+
+# Data directory
+data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

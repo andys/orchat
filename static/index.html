@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OrChat</title>
+<style>
+  :root {
+    --sidebar-width: 280px;
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-chat: #0f0f23;
+    --bg-input: #1a1a3e;
+    --bg-hover: #1f2b4d;
+    --bg-active: #253255;
+    --text-primary: #e8e8f0;
+    --text-secondary: #a0a0b8;
+    --text-muted: #6c6c88;
+    --accent: #6c63ff;
+    --accent-hover: #5a52e0;
+    --border: #2a2a4a;
+    --user-bg: #2a2a5a;
+    --assistant-bg: #1e1e3a;
+    --danger: #e74c3c;
+    --danger-hover: #c0392b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-chat);
+    color: var(--text-primary);
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-header h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+  }
+
+  .model-select {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+  }
+  .model-select:focus { border-color: var(--accent); }
+
+  .new-chat-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .new-chat-btn:hover { background: var(--accent-hover); }
+
+  .chat-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .chat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-bottom: 2px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .chat-item:hover { background: var(--bg-hover); }
+  .chat-item.active { background: var(--bg-active); }
+
+  .chat-item-title {
+    flex: 1;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+  }
+
+  .chat-item-delete {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .chat-item:hover .chat-item-delete { display: block; }
+  .chat-item-delete:hover { color: var(--danger); background: rgba(231,76,60,0.1); }
+
+  /* Main chat area */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    min-width: 0;
+  }
+
+  .chat-header {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-primary);
+    font-size: 14px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 52px;
+  }
+
+  .chat-header .model-name {
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .message {
+    max-width: 800px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 16px 20px;
+    border-radius: 12px;
+    line-height: 1.6;
+    font-size: 15px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  .message.user {
+    background: var(--user-bg);
+    border: 1px solid rgba(108,99,255,0.2);
+  }
+
+  .message.assistant {
+    background: var(--assistant-bg);
+    border: 1px solid var(--border);
+  }
+
+  .message .role-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+  }
+  .message.user .role-label { color: var(--accent); }
+  .message.assistant .role-label { color: #50c878; }
+
+  .message-content {
+    color: var(--text-primary);
+  }
+
+  /* Markdown rendered content in assistant messages */
+  .message.assistant .message-content {
+    white-space: normal;
+  }
+
+  .message.assistant .message-content p {
+    margin-bottom: 12px;
+  }
+  .message.assistant .message-content p:last-child {
+    margin-bottom: 0;
+  }
+
+  .message.assistant .message-content h1,
+  .message.assistant .message-content h2,
+  .message.assistant .message-content h3,
+  .message.assistant .message-content h4,
+  .message.assistant .message-content h5,
+  .message.assistant .message-content h6 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text-primary);
+  }
+  .message.assistant .message-content h1 { font-size: 1.5em; }
+  .message.assistant .message-content h2 { font-size: 1.3em; }
+  .message.assistant .message-content h3 { font-size: 1.15em; }
+  .message.assistant .message-content h1:first-child,
+  .message.assistant .message-content h2:first-child,
+  .message.assistant .message-content h3:first-child {
+    margin-top: 0;
+  }
+
+  .message.assistant .message-content code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.88em;
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .message.assistant .message-content pre {
+    background: #0d0d1a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 12px 0;
+    line-height: 1.5;
+  }
+
+  .message.assistant .message-content pre code {
+    background: none;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    font-size: 0.88em;
+    white-space: pre;
+  }
+
+  .message.assistant .message-content ul,
+  .message.assistant .message-content ol {
+    margin: 10px 0;
+    padding-left: 24px;
+  }
+
+  .message.assistant .message-content li {
+    margin-bottom: 4px;
+    line-height: 1.6;
+  }
+
+  .message.assistant .message-content blockquote {
+    border-left: 3px solid var(--accent);
+    margin: 12px 0;
+    padding: 8px 16px;
+    color: var(--text-secondary);
+    background: rgba(108,99,255,0.05);
+    border-radius: 0 6px 6px 0;
+  }
+
+  .message.assistant .message-content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+  }
+
+  .message.assistant .message-content th,
+  .message.assistant .message-content td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+
+  .message.assistant .message-content th {
+    background: rgba(255,255,255,0.04);
+    font-weight: 600;
+  }
+
+  .message.assistant .message-content a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .message.assistant .message-content a:hover {
+    text-decoration: underline;
+  }
+
+  .message.assistant .message-content hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 16px 0;
+  }
+
+  .message.assistant .message-content strong {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .message.assistant .message-content em {
+    font-style: italic;
+    color: var(--text-secondary);
+  }
+
+  .welcome {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 40px;
+  }
+
+  .welcome h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+  }
+
+  .welcome p {
+    font-size: 16px;
+    max-width: 500px;
+    line-height: 1.5;
+  }
+
+  /* Input area */
+  .input-area {
+    padding: 16px 24px 24px;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border);
+  }
+
+  .input-container {
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    gap: 10px;
+  }
+
+  .input-container textarea {
+    flex: 1;
+    padding: 12px 16px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 15px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    min-height: 48px;
+    max-height: 200px;
+    line-height: 1.5;
+  }
+  .input-container textarea:focus { border-color: var(--accent); }
+  .input-container textarea::placeholder { color: var(--text-muted); }
+
+  .send-btn {
+    padding: 12px 20px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    align-self: flex-end;
+    white-space: nowrap;
+  }
+  .send-btn:hover { background: var(--accent-hover); }
+  .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  .loading-dots::after {
+    content: '';
+    animation: dots 1.5s infinite;
+  }
+  @keyframes dots {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60%, 100% { content: '...'; }
+  }
+
+  .empty-chats {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h2>🤖 OrChat</h2>
+    <select id="modelSelect" class="model-select">
+      <option value="">Loading models...</option>
+    </select>
+    <button id="newChatBtn" class="new-chat-btn">+ New Chat</button>
+  </div>
+  <div id="chatList" class="chat-list">
+    <div class="empty-chats">No chats yet</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="chat-header">
+    <span id="chatHeaderTitle">Select or start a new chat</span>
+    <span id="chatHeaderModel" class="model-name"></span>
+  </div>
+
+  <div id="messagesContainer" class="messages">
+    <div class="welcome">
+      <h1>Welcome to OrChat</h1>
+      <p>Select a model from the dropdown and start a new conversation, or continue a previous one from the sidebar.</p>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-container">
+      <textarea id="messageInput" placeholder="Type your message..." rows="1" disabled></textarea>
+      <button id="sendBtn" class="send-btn" disabled>Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const state = {
+  chats: [],
+  currentChatId: null,
+  models: [],
+  selectedModel: '',
+  streaming: false,
+};
+
+const el = {
+  modelSelect: document.getElementById('modelSelect'),
+  newChatBtn: document.getElementById('newChatBtn'),
+  chatList: document.getElementById('chatList'),
+  messagesContainer: document.getElementById('messagesContainer'),
+  messageInput: document.getElementById('messageInput'),
+  sendBtn: document.getElementById('sendBtn'),
+  chatHeaderTitle: document.getElementById('chatHeaderTitle'),
+  chatHeaderModel: document.getElementById('chatHeaderModel'),
+};
+
+// --- API helpers ---
+async function api(url, opts = {}) {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  if (opts.method === 'DELETE' && res.status === 204) return null;
+  return res.json();
+}
+
+// --- Load models ---
+async function loadModels() {
+  try {
+    const models = await api('/api/models');
+    state.models = models;
+    el.modelSelect.innerHTML = '';
+    models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name;
+      el.modelSelect.appendChild(opt);
+    });
+
+    // Load prefs
+    const prefs = await api('/api/preferences');
+    if (prefs.selected_model && models.find(m => m.id === prefs.selected_model)) {
+      state.selectedModel = prefs.selected_model;
+      el.modelSelect.value = prefs.selected_model;
+    } else if (models.length > 0) {
+      state.selectedModel = models[0].id;
+    }
+  } catch (err) {
+    console.error('Failed to load models:', err);
+    el.modelSelect.innerHTML = '<option value="">Failed to load models</option>';
+  }
+}
+
+// --- Load chats ---
+async function loadChats() {
+  try {
+    state.chats = await api('/api/chats');
+    renderChatList();
+  } catch (err) {
+    console.error('Failed to load chats:', err);
+  }
+}
+
+// --- Render chat list ---
+function renderChatList() {
+  if (state.chats.length === 0) {
+    el.chatList.innerHTML = '<div class="empty-chats">No chats yet</div>';
+    return;
+  }
+
+  el.chatList.innerHTML = state.chats.map(chat => `
+    <div class="chat-item ${chat.id === state.currentChatId ? 'active' : ''}"
+         data-id="${chat.id}" onclick="selectChat('${chat.id}')">
+      <span class="chat-item-title">${escapeHtml(chat.title)}</span>
+      <button class="chat-item-delete" onclick="event.stopPropagation(); deleteChat('${chat.id}')" title="Delete">×</button>
+    </div>
+  `).join('');
+}
+
+// --- Select chat ---
+async function selectChat(id) {
+  try {
+    const chat = await api(`/api/chats/${id}`);
+    state.currentChatId = chat.id;
+    renderChatList();
+    renderMessages(chat.messages || []);
+    el.chatHeaderTitle.textContent = chat.title;
+    el.chatHeaderModel.textContent = chat.model;
+    el.messageInput.disabled = false;
+    el.sendBtn.disabled = false;
+
+    // Update model dropdown to match chat's model
+    if (chat.model) {
+      el.modelSelect.value = chat.model;
+      state.selectedModel = chat.model;
+    }
+
+    el.messageInput.focus();
+  } catch (err) {
+    console.error('Failed to load chat:', err);
+  }
+}
+
+// --- Render messages ---
+function renderMessages(messages) {
+  if (messages.length === 0) {
+    el.messagesContainer.innerHTML = `
+      <div class="welcome">
+        <h1>Start Chatting</h1>
+        <p>Type a message below to begin the conversation.</p>
+      </div>
+    `;
+    return;
+  }
+
+  el.messagesContainer.innerHTML = messages.map(msg => `
+    <div class="message ${msg.role}">
+      <div class="role-label">${msg.role === 'user' ? 'You' : 'Assistant'}</div>
+      <div class="message-content">${msg.role === 'assistant' && msg.content_html ? msg.content_html : escapeHtml(msg.content)}</div>
+    </div>
+  `).join('');
+
+  scrollToBottom();
+}
+
+// --- New chat ---
+async function newChat() {
+  const model = el.modelSelect.value;
+  if (!model) {
+    alert('Please select a model first.');
+    return;
+  }
+
+  try {
+    const chat = await api('/api/chats', {
+      method: 'POST',
+      body: JSON.stringify({ model }),
+    });
+    state.currentChatId = chat.id;
+    await loadChats();
+    renderMessages([]);
+    el.chatHeaderTitle.textContent = chat.title;
+    el.chatHeaderModel.textContent = chat.model;
+    el.messageInput.disabled = false;
+    el.sendBtn.disabled = false;
+    el.messageInput.focus();
+  } catch (err) {
+    console.error('Failed to create chat:', err);
+  }
+}
+
+// --- Delete chat ---
+async function deleteChat(id) {
+  if (!confirm('Delete this chat?')) return;
+  try {
+    await api(`/api/chats/${id}`, { method: 'DELETE' });
+    if (state.currentChatId === id) {
+      state.currentChatId = null;
+      el.messagesContainer.innerHTML = `
+        <div class="welcome">
+          <h1>Welcome to OrChat</h1>
+          <p>Select a model from the dropdown and start a new conversation.</p>
+        </div>
+      `;
+      el.chatHeaderTitle.textContent = 'Select or start a new chat';
+      el.chatHeaderModel.textContent = '';
+      el.messageInput.disabled = true;
+      el.sendBtn.disabled = true;
+    }
+    await loadChats();
+  } catch (err) {
+    console.error('Failed to delete chat:', err);
+  }
+}
+
+// --- Send message ---
+async function sendMessage() {
+  if (state.streaming || !state.currentChatId) return;
+
+  const content = el.messageInput.value.trim();
+  if (!content) return;
+
+  state.streaming = true;
+  el.sendBtn.disabled = true;
+  el.messageInput.value = '';
+  autoResize(el.messageInput);
+
+  // Add user message to UI
+  appendMessage('user', content);
+
+  // Add assistant placeholder
+  const assistantDiv = appendMessage('assistant', '');
+  const contentEl = assistantDiv.querySelector('.message-content');
+  contentEl.innerHTML = '<span class="loading-dots">Thinking</span>';
+
+  try {
+    const response = await fetch(`/api/chats/${state.currentChatId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content,
+        model: el.modelSelect.value,
+      }),
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6);
+        if (data === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.error) {
+            contentEl.textContent = `Error: ${parsed.error}`;
+            state.streaming = false;
+            el.sendBtn.disabled = false;
+            return;
+          }
+          if (parsed.content) {
+            fullText += parsed.content;
+            contentEl.innerText = fullText;
+            scrollToBottom();
+          }
+        } catch (e) {
+          // ignore parse errors
+        }
+      }
+    }
+
+    // Render final markdown to HTML
+    if (fullText) {
+      try {
+        const renderResp = await api('/api/render-markdown', {
+          method: 'POST',
+          body: JSON.stringify({ content: fullText }),
+        });
+        if (renderResp.html) {
+          contentEl.innerHTML = renderResp.html;
+        }
+      } catch (e) {
+        // Fall back to plain text if render fails
+        console.error('Markdown render failed:', e);
+      }
+    }
+
+    // Reload chat list to update title
+    await loadChats();
+    scrollToBottom();
+  } catch (err) {
+    contentEl.textContent = `Error: ${err.message}`;
+  }
+
+  state.streaming = false;
+  el.sendBtn.disabled = false;
+  el.messageInput.focus();
+}
+
+function appendMessage(role, content) {
+  // Remove welcome if present
+  const welcome = el.messagesContainer.querySelector('.welcome');
+  if (welcome) welcome.remove();
+
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+  div.innerHTML = `
+    <div class="role-label">${role === 'user' ? 'You' : 'Assistant'}</div>
+    <div class="message-content">${escapeHtml(content)}</div>
+  `;
+  el.messagesContainer.appendChild(div);
+  scrollToBottom();
+  return div;
+}
+
+function scrollToBottom() {
+  el.messagesContainer.scrollTop = el.messagesContainer.scrollHeight;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// --- Auto-resize textarea ---
+function autoResize(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+}
+
+// --- Event listeners ---
+el.newChatBtn.addEventListener('click', newChat);
+el.sendBtn.addEventListener('click', sendMessage);
+
+el.messageInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+el.messageInput.addEventListener('input', () => {
+  autoResize(el.messageInput);
+});
+
+el.modelSelect.addEventListener('change', async () => {
+  state.selectedModel = el.modelSelect.value;
+  try {
+    await api('/api/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ selected_model: state.selectedModel }),
+    });
+  } catch (err) {
+    console.error('Failed to save preferences:', err);
+  }
+
+  // Update the header if a chat is active
+  if (state.currentChatId) {
+    el.chatHeaderModel.textContent = state.selectedModel;
+  }
+});
+
+// --- Init ---
+(async () => {
+  await loadModels();
+  await loadChats();
+})();
+</script>
+
+</body>
+</html>
