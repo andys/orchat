@@ -2,6 +2,8 @@
 
 A simple LLM chat web app powered by [OpenRouter](https://openrouter.ai/), built with Go and [Fiber](https://gofiber.io/).
 
+![Screenshot](screenshot.jpg)
+
 ## Features
 
 - Chat with any LLM available on OpenRouter
